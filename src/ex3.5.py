@@ -1,6 +1,25 @@
 import scipy.stats as ss
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.neighbors import KernelDensity
+
+
+def kde2D(x, y, bandwidth, xbins=100j, ybins=100j, **kwargs):
+    """Build 2D kernel density estimate (KDE)."""
+
+    # create grid of sample locations (default: 100x100)
+    xx, yy = np.mgrid[x.min():x.max():xbins,
+                      y.min():y.max():ybins]
+
+    xy_sample = np.vstack([yy.ravel(), xx.ravel()]).T
+    xy_train  = np.vstack([y, x]).T
+
+    kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
+    kde_skl.fit(xy_train)
+
+    # score_samples() returns the log-likelihood of the samples
+    z = np.exp(kde_skl.score_samples(xy_sample))
+    return xx, yy, np.reshape(z, xx.shape)
 
 
 def main():
@@ -51,34 +70,24 @@ def main():
     # s ^ 2  # compare posterior mean and interval with s^2
     print(f"posterior mean and interval with s^2 = {s ** 2}")
     # Visualizing the first few steps of the "sample path" ...
-    maxit = 30  # number of iterates to show
+    maxit = 20  # number of iterates to show
 
     fig, ax = plt.subplots()
-    ax.quiver(mus[:maxit -1], sigma_2s[:maxit -1],
-              mus[1:maxit] - mus[:maxit-1],
-              sigma_2s[1:maxit] - sigma_2s[:maxit-1],
-              scale_units='xy', angles='xy', scale=1, width=0.005)
-    ax.set_title('Start of sample path')
+    ax.plot(mus[:maxit], sigma_2s[:maxit])
+    ax.set_title('Joint PDF (informative Semi-Conjugate Prior)')
     ax.set_ylabel(r"$\sigma^2$")
     ax.set_xlabel(r"$\mu$")
-    ax.scatter(mus[:maxit], sigma_2s[:maxit])
     plt.show()
 
-    xmin, xmax = 7.88, 7.94
-    ymin, ymax = 0, 0.01
-    xx, yy = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
-    positions = np.vstack([xx.ravel(), yy.ravel()])
-    values = np.vstack([mus, sigma_2s])
-    kernel = ss.gaussian_kde(values)
-    f = np.reshape(kernel(positions).T, xx.shape)
+    xx, yy, zz = kde2D(mus, sigma_2s, 1.0)
 
     fig, ax = plt.subplots()
-    cs = ax.contour(xx, yy, f)
-    ax.clabel(cs, inline=True, fontsize=5)
-    ax.set_ylabel(r"$\sigma^2$")
-    ax.set_xlabel(r"$\mu$")
-    ax.set_title('Joint PDF (Informative Semi-Conjugate Prior)')
-    plt.show()
+    ax.pcolormesh(xx, yy, zz)
+    ax.scatter(mus, sigma_2s, s=2, facecolor='white')
+
+    print(1)
+
+    pass
 
 
 if __name__ == "__main__":
